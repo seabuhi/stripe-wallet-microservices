@@ -1,57 +1,60 @@
 package com.backend.stripewalletapi.consumer;
 
-import com.backend.stripewalletapi.event.PaymentCompletedEvent;
-import com.backend.stripewalletapi.event.PaymentFailedEvent;
 import com.backend.stripewalletapi.service.WalletService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.retrytopic.TopicSuffixingStrategy;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Service;
 
-/**
- * PaymentConsumer: Consumes payment events from the Payment Service.
- * Senior pattern: Updates balance and transaction status based on distributed events.
- * Includes Retry and DLQ for exactly-once flow stability.
- */
-@Slf4j
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentConsumer {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PaymentConsumer.class);
 
     private final WalletService walletService;
     private final ObjectMapper objectMapper;
 
     @RetryableTopic(
-            attempts = "4",
-            backoff = @Backoff(delay = 1000, multiplier = 2.0),
+            attempts = "3",
+            backoff = @Backoff(delay = 2000, multiplier = 2.0),
             topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE,
             dltTopicSuffix = "-dlq"
     )
-    @KafkaListener(topics = "payment-completed", groupId = "wallet-group")
-    public void handlePaymentCompleted(String message) {
-        log.info("WALLET-SERVICE: Received payment-completed event");
+    @KafkaListener(topics = "payment-events", groupId = "wallet-payment-group")
+    public void consume(ConsumerRecord<String, String> record) {
+        String payload = record.value();
+        log.info("KAFKA: Received payment event: {}", payload);
+
         try {
-            PaymentCompletedEvent event = objectMapper.readValue(message, PaymentCompletedEvent.class);
-            walletService.completeTopUp(event.getSessionId(), event.getPaymentIntentId(), 
-                    event.getUserId(), event.getAmount());
+            Map<String, Object> event = objectMapper.readValue(payload, Map.class);
+            String type = (String) event.get("type");
+
+            if ("PAYMENT_SUCCESS".equals(type)) {
+                String sessionId = (String) event.get("sessionId");
+                String paymentIntentId = (String) event.get("paymentIntentId");
+                UUID userId = UUID.fromString((String) event.get("userId"));
+                BigDecimal amount = new BigDecimal(event.get("amount").toString());
+
+                walletService.completeTopUp(sessionId, paymentIntentId, userId, amount);
+                log.info("KAFKA: Successfully processed payment for user {}", userId);
+            }
         } catch (Exception e) {
-            log.error("Failed to process payment-completed event. Triggering retry.");
+            log.error("KAFKA: Error processing payment event: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
 
-    @KafkaListener(topics = "payment-failed", groupId = "wallet-group")
-    public void handlePaymentFailed(String message) {
-        log.info("WALLET-SERVICE: Received payment-failed event");
-        try {
-            PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
-            walletService.markTransactionFailed(event.getPaymentIntentId(), event.getReason());
-        } catch (Exception e) {
-            log.error("Failed to process payment-failed event", e);
-        }
+    @KafkaListener(topics = "payment-events-dlq", groupId = "wallet-payment-dlq-group")
+    public void handleDlq(String message) {
+        log.error("KAFKA-DLQ: Payment event failed all retries: {}", message);
     }
 }

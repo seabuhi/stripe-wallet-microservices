@@ -1,8 +1,16 @@
 package com.backend.stripewalletapi.dto.response;
 
-/**
- * Holds both the Stripe Checkout URL and the session ID.
- * The session ID is stored on the PENDING transaction so webhook can
- * find the exact transaction later.
- */
-public record CheckoutSessionResult(String url, String sessionId) {}
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@AllArgsConstructor
+public class CheckoutSessionResult {
+    private String checkoutUrl;
+    private String sessionId;
+
+    public String getCheckoutUrl() { return checkoutUrl; }
+    public void setCheckoutUrl(String checkoutUrl) { this.checkoutUrl = checkoutUrl; }
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+}

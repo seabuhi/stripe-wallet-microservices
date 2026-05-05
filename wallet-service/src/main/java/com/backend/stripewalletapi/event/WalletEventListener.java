@@ -2,7 +2,6 @@ package com.backend.stripewalletapi.event;
 
 import com.backend.stripewalletapi.service.NotificationService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -11,14 +10,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * WalletEventListener: Decoupled side-effect handler.
- * Senior pattern: Listens to domain events. 
- * Distributed Auditing is handled by the 'audit-service' via Kafka.
- * Local side-effects like Notifications are handled here.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WalletEventListener {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WalletEventListener.class);
 
     private final NotificationService notificationService;
 
@@ -26,15 +23,11 @@ public class WalletEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleTransactionCompleted(TransactionCompletedEvent event) {
         log.info("EVENT: Local side-effects for TransactionCompletedEvent: {}", event.getTransactionId());
-        
-        // Local side-effect: Notification
-        notificationService.send(event.getUserId(), "Transaction successful: " + event.getTransactionId());
-        
-        // Distributed Auditing: audit-service is already listening to 'wallet-events' topic via OutboxRelay
+        notificationService.sendBalanceNotification(event.getUserId(), java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO);
     }
 
     @EventListener
     public void handleBalanceUpdated(BalanceUpdatedEvent event) {
-        log.info("EVENT: User {} balance updated. Change: {}", event.getUserId(), event.getChange());
+        log.info("EVENT: User {} balance updated. Change: {}", event.getUserId(), event.getChangeAmount());
     }
 }

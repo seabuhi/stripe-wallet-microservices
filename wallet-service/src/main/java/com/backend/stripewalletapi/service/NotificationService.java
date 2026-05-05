@@ -10,9 +10,9 @@ import java.util.UUID;
 /**
  * Mock Notification Service to demonstrate decoupled event-driven architecture.
  */
-@Slf4j
 @Service
 public class NotificationService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NotificationService.class);
 
     @Async("auditLogExecutor")
     public void sendBalanceNotification(UUID userId, BigDecimal amount, BigDecimal newBalance) {

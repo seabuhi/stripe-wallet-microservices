@@ -1,16 +1,10 @@
 package com.backend.stripewalletapi.event;
 
-import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/**
- * Event published specifically when a wallet balance changes.
- * Useful for real-time analytics, push notifications, or cache invalidation.
- */
-@Getter
 public class BalanceUpdatedEvent extends ApplicationEvent {
 
     private final UUID userId;
@@ -23,4 +17,8 @@ public class BalanceUpdatedEvent extends ApplicationEvent {
         this.newBalance = newBalance;
         this.changeAmount = changeAmount;
     }
+
+    public UUID getUserId() { return userId; }
+    public BigDecimal getNewBalance() { return newBalance; }
+    public BigDecimal getChangeAmount() { return changeAmount; }
 }

@@ -11,11 +11,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "wallet_transactions")
-@Getter
-@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class WalletTransaction {
 
     @Id
@@ -34,29 +32,52 @@ public class WalletTransaction {
     @Column(nullable = false)
     private TransactionStatus status;
 
-    @Column(nullable = false, precision = 19, scale = 4)
+    @Column(nullable = false)
     private BigDecimal amount;
 
-    @Column(name = "idempotency_key")
-    private String idempotencyKey;
-
-    @Column(name = "stripe_payment_intent_id")
-    private String stripePaymentIntentId;
+    @Column(nullable = false)
+    private String currency;
 
     @Column(name = "stripe_session_id")
     private String stripeSessionId;
 
-    @Column(name = "related_transaction_id")
-    private UUID relatedTransactionId;
+    @Column(name = "stripe_payment_intent_id")
+    private String stripePaymentIntentId;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(length = 500)
     private String description;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "failure_reason")
+    private String failureReason;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public Wallet getWallet() { return wallet; }
+    public void setWallet(Wallet wallet) { this.wallet = wallet; }
+    public TransactionType getType() { return type; }
+    public void setType(TransactionType type) { this.type = type; }
+    public TransactionStatus getStatus() { return status; }
+    public void setStatus(TransactionStatus status) { this.status = status; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+    public String getStripeSessionId() { return stripeSessionId; }
+    public void setStripeSessionId(String stripeSessionId) { this.stripeSessionId = stripeSessionId; }
+    public String getStripePaymentIntentId() { return stripePaymentIntentId; }
+    public void setStripePaymentIntentId(String stripePaymentIntentId) { this.stripePaymentIntentId = stripePaymentIntentId; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getFailureReason() { return failureReason; }
+    public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
