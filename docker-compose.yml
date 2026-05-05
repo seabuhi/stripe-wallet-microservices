@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # Infrastructure
+  wallet_db:
+    image: postgres:16-alpine
+    container_name: wallet_db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_MULTIPLE_DATABASES=auth_db,wallet_db,audit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+
+  redis:
+    image: redis:7-alpine
+    container_name: wallet_redis
+    ports:
+      - "6379:6379"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # Microservices
+  gateway-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: gateway-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - wallet-service
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+
+  auth-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: auth-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - wallet_db
+      - redis
+    environment:
+      - DB_HOST=wallet_db
+
+  wallet-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: wallet-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - wallet_db
+      - kafka
+      - redis
+    environment:
+      - DB_HOST=wallet_db
+      - KAFKA_SERVERS=kafka:29092
+
+  payment-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: payment-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_SERVERS=kafka:29092
+
+  audit-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: audit-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      - wallet_db
+      - kafka
+    environment:
+      - DB_HOST=wallet_db
+      - KAFKA_SERVERS=kafka:29092
+
+  # Observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+
+volumes:
+  postgres_data:

@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: payment-service
+
+server:
+  port: 8083
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  success-url: ${APP_BASE_URL:http://localhost:8080}/api/v1/wallet/top-up/success?session_id={CHECKOUT_SESSION_ID}
+  cancel-url: ${APP_BASE_URL:http://localhost:8080}/api/v1/wallet/top-up/cancel
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus

@@ -1,0 +1,113 @@
+spring:
+  application:
+    name: stripe-wallet-api
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/wallet_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      retries: 3
+      acks: all
+      enable-idempotence: true
+      transactional-id-prefix: tx-wallet-
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      isolation-level: read_committed
+
+  observations:
+    key-values:
+      application: ${spring.application.name}
+
+
+server:
+  port: 8082
+  error:
+    include-message: always
+    include-binding-errors: always
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  success-url: ${APP_BASE_URL:http://localhost:8080}/api/v1/wallet/top-up/success?session_id={CHECKOUT_SESSION_ID}
+  cancel-url: ${APP_BASE_URL:http://localhost:8080}/api/v1/wallet/top-up/cancel
+
+jwt:
+  secret: ${JWT_SECRET:c2VjcmV0a2V5Zm9yc3RyaXBld2FsbGV0YXBpMTIzNDU2Nzg5MA==}
+  expiration: 86400000
+
+rate-limit:
+  max-requests: 30
+  window-seconds: 60
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0 # Sample 100% for development
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [${spring.application.name},%X{traceId:-},%X{spanId:-}] - %msg%n"
+  level:
+    com.backend.stripewalletapi: DEBUG
+    org.springframework.security: INFO

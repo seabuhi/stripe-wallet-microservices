@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      default-filters:
+        - AddRequestHeader=X-Internal-API-Key, ${INTERNAL_API_KEY:secret-internal-key}
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: wallet-service
+          uri: http://wallet-service:8082
+          predicates:
+            - Path=/api/v1/wallet/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: walletServiceCB
+                fallbackUri: forward:/fallback/wallet
+        - id: payment-service
+          uri: http://payment-service:8083
+          predicates:
+            - Path=/api/v1/stripe/**
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      walletServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        registerHealthIndicator: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
